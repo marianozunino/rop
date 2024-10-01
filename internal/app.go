@@ -209,12 +209,22 @@ func (app *App) deleteFileFromPod(ctx context.Context, filePath string) error {
 
 func (app *App) executeScript(ctx context.Context, filePath string) error {
 	command := []string{"sh", filePath}
-	if filepath.Ext(app.filePath) == ".js" {
+
+	switch filepath.Ext(filePath) {
+	case ".js":
 		command = []string{"node", filePath}
+	case ".py":
+		command = []string{"python", filePath}
+	case ".rb":
+		command = []string{"ruby", filePath}
+	default:
+		return fmt.Errorf("unsupported script type: %s", filepath.Ext(filePath))
 	}
+
 	if app.args != "" {
 		command = append(command, app.args)
 	}
+
 	return app.runCommandInPod(ctx, command)
 }
 
