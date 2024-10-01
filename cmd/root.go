@@ -59,8 +59,8 @@ func NewRootCmd() *cobra.Command {
 
 Run on Pod (ROP) is a tool to execute scripts or binaries on Kubernetes pods.
 It simplifies the process of running files directly in your Kubernetes environment.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRop(cmd.Context(), cfg)
+		Run: func(cmd *cobra.Command, args []string) {
+			runRop(cmd.Context(), cfg)
 		},
 	}
 
