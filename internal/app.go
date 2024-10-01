@@ -177,7 +177,11 @@ func (app *App) executeFile(ctx context.Context) error {
 		}
 	}
 
-	tempPath := fmt.Sprintf("/tmp/%s", filepath.Base(app.filePath))
+	if app.destPath == "" {
+		app.destPath = "/tmp"
+	}
+
+	tempPath := fmt.Sprintf("%s/%s", app.destPath, filepath.Base(app.filePath))
 
 	// Ensure cleanup happens
 	defer func() {

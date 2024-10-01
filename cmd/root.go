@@ -39,6 +39,7 @@ type config struct {
 	noConfirm     bool
 	fileType      string
 	fileArgs      string
+	destPath      string
 }
 
 var logo = `
@@ -76,6 +77,7 @@ func addFlags(cmd *cobra.Command, cfg *config) {
 	cmd.Flags().BoolVarP(&cfg.noConfirm, "no-confirm", "n", false, "Skip confirmation prompt")
 	cmd.Flags().StringVarP(&cfg.fileType, "type", "t", "auto", "File type: 'script', 'binary', or 'auto'")
 	cmd.Flags().StringVarP(&cfg.fileArgs, "args", "a", "", "Arguments to pass to the script or binary")
+	cmd.Flags().StringVarP(&cfg.destPath, "dest-path", "d", "/tmp", "Destination path for the script or binary")
 
 	cmd.MarkFlagRequired("context")
 	cmd.MarkFlagRequired("file")
@@ -99,6 +101,7 @@ func runRop(ctx context.Context, cfg *config) error {
 		app.WithNoConfirm(cfg.noConfirm),
 		app.WithFileType(cfg.fileType),
 		app.WithArgs(cfg.fileArgs),
+		app.WithDestPath(cfg.destPath),
 	)
 
 	return appInstance.Run(ctx)

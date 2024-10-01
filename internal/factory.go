@@ -18,6 +18,7 @@ var (
 	confirm       bool
 	fileType      string
 	args          string
+	destPath      string
 )
 
 type App struct {
@@ -28,6 +29,7 @@ type App struct {
 	noConfirm     bool
 	fileType      string
 	args          string
+	destPath      string
 	clientset     *kubernetes.Clientset
 	config        *rest.Config
 	pod           *corev1.Pod
@@ -73,6 +75,12 @@ func WithFileType(fileType string) func(app *App) {
 func WithArgs(args string) func(app *App) {
 	return func(app *App) {
 		app.args = args
+	}
+}
+
+func WithDestPath(destPath string) func(app *App) {
+	return func(app *App) {
+		app.destPath = destPath
 	}
 }
 
