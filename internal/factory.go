@@ -28,8 +28,9 @@ type App struct {
 	containerName string
 	noConfirm     bool
 	fileType      string
-	args          string
+	args          []string
 	destPath      string
+	runner        string
 	clientset     *kubernetes.Clientset
 	config        *rest.Config
 	pod           *corev1.Pod
@@ -72,7 +73,7 @@ func WithFileType(fileType string) func(app *App) {
 	}
 }
 
-func WithArgs(args string) func(app *App) {
+func WithArgs(args []string) func(app *App) {
 	return func(app *App) {
 		app.args = args
 	}
@@ -81,6 +82,12 @@ func WithArgs(args string) func(app *App) {
 func WithDestPath(destPath string) func(app *App) {
 	return func(app *App) {
 		app.destPath = destPath
+	}
+}
+
+func WithRunner(runner string) func(app *App) {
+	return func(app *App) {
+		app.runner = runner
 	}
 }
 
