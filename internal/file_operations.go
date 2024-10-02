@@ -22,8 +22,9 @@ func (app *App) validateFileExistence() error {
 }
 
 func (app *App) copyFileToPod(ctx context.Context, file *os.File, destPath string) error {
-	command := []string{"cp", "/dev/stdin", destPath}
+	log.Debug().Msgf("Copying file to pod: %s", destPath)
 
+	command := []string{"cp", "/dev/stdin", destPath}
 	req := app.clientset.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(app.pod.Name).
@@ -52,6 +53,8 @@ func (app *App) copyFileToPod(ctx context.Context, file *os.File, destPath strin
 	if err != nil {
 		return fmt.Errorf("error copying file to pod: %w, stderr: %s", err, stderr.String())
 	}
+
+	log.Debug().Msgf("File copied to pod: %s", stdout.String())
 
 	return nil
 }
@@ -90,9 +93,9 @@ func (app *App) executeFile(ctx context.Context) error {
 	// Ensure cleanup happens
 	defer func() {
 		if err := app.deleteFileFromPod(ctx, tempPath); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Failed to delete file %s from pod: %v\n", tempPath, err)
+			log.Warn().Err(err).Msgf("Failed to delete file %s from pod", tempPath)
 		} else {
-			fmt.Fprintf(os.Stdout, "Deleted file %s from pod\n", tempPath)
+			log.Debug().Msgf("Deleted file %s from pod", tempPath)
 		}
 	}()
 

@@ -18,7 +18,7 @@ func (app *App) Run(ctx context.Context) error {
 	}
 
 	if !app.noConfirm {
-		if err := app.confirmAction(); err != nil {
+		if err := confirmAction(app.filePath, app.pod.Name, app.containerName); err != nil {
 			return err
 		}
 	}
@@ -33,11 +33,9 @@ func (app *App) setupPodAndContainer(ctx context.Context) error {
 	}
 	app.pod = pod
 
-	containerName, err := app.selectOrSetContainer()
-	if err != nil {
+	if err := app.selectOrSetContainer(); err != nil {
 		return err
 	}
-	app.containerName = containerName
 
 	return nil
 }
