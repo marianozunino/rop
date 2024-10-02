@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
@@ -111,14 +112,14 @@ func (app *App) executeScript(ctx context.Context, filePath string) error {
 	if app.runner != "" {
 		command = []string{app.runner, filePath}
 	} else {
-		fmt.Println("No runner specified. Infering from file extension...")
+		log.Debug().Msgf("No runner specified. Infering from file extension...")
 		ext := filepath.Ext(filePath)
 		switch ext {
 		case ".js":
-			fmt.Println("Using node as runner...")
+			log.Debug().Msgf("Using node as runner...")
 			command = []string{"node", filePath}
 		case ".py":
-			fmt.Println("Using python as runner...")
+			log.Debug().Msgf("Using python as runner...")
 			command = []string{"python", filePath}
 		case ".rb":
 			fmt.Println("Using ruby as runner...")
@@ -135,7 +136,7 @@ func (app *App) executeScript(ctx context.Context, filePath string) error {
 		command = append(command, app.args...)
 	}
 
-	fmt.Printf("Running command: %s\n", strings.Join(command, " "))
+	log.Debug().Msgf("Running command: %s\n", strings.Join(command, " "))
 
 	return app.runCommandInPod(ctx, command)
 }

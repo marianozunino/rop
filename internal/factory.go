@@ -2,23 +2,12 @@ package app
 
 import (
 	"flag"
-	"fmt"
 	"os"
 
+	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-)
-
-var (
-	kubeContext   string
-	filePath      string
-	podName       string
-	containerName string
-	confirm       bool
-	fileType      string
-	args          string
-	destPath      string
 )
 
 type App struct {
@@ -31,15 +20,23 @@ type App struct {
 	args          []string
 	destPath      string
 	runner        string
-	clientset     *kubernetes.Clientset
-	config        *rest.Config
-	pod           *corev1.Pod
+
+	namespace string
+	clientset *kubernetes.Clientset
+	config    *rest.Config
+	pod       *corev1.Pod
 }
 
 // Option setters for App struct
 func WithKubeContext(context string) func(app *App) {
 	return func(app *App) {
 		app.kubeContext = context
+	}
+}
+
+func WithNamespace(namespace string) func(app *App) {
+	return func(app *App) {
+		app.namespace = namespace
 	}
 }
 
@@ -105,13 +102,13 @@ func NewApp(opts ...func(app *App)) *App {
 
 func (app *App) validateRequiredFields() {
 	if app.kubeContext == "" || app.filePath == "" || app.podName == "" {
-		fmt.Println("Error: context, file, and pod name are required")
+		log.Error().Msg("Error: context, file, and pod name are required")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
 	if app.fileType != "auto" && app.fileType != "script" && app.fileType != "binary" {
-		fmt.Println("Error: type must be 'auto', 'script', or 'binary'")
+		log.Error().Msg("Error: type must be 'auto', 'script', or 'binary'")
 		os.Exit(1)
 	}
 }
