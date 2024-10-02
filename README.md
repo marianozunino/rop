@@ -8,9 +8,12 @@
 
 ## Installation
 To install Run on Pod, run:
+
 ```bash
 go install github.com/marianozunino/rop@latest
 ```
+
+Or download the binary from the [GitHub releases](https://github.com/marianozunino/rop/releases)
 
 ## Usage
 ```
