@@ -38,8 +38,9 @@ type config struct {
 	containerName string
 	noConfirm     bool
 	fileType      string
-	fileArgs      string
+	fileArgs      []string
 	destPath      string
+	runner        string
 }
 
 var logo = `
@@ -76,8 +77,9 @@ func addFlags(cmd *cobra.Command, cfg *config) {
 	cmd.Flags().StringVar(&cfg.containerName, "container", "", "The container name (optional for single-container pods)")
 	cmd.Flags().BoolVarP(&cfg.noConfirm, "no-confirm", "n", false, "Skip confirmation prompt")
 	cmd.Flags().StringVarP(&cfg.fileType, "type", "t", "auto", "File type: 'script', 'binary', or 'auto'")
-	cmd.Flags().StringVarP(&cfg.fileArgs, "args", "a", "", "Arguments to pass to the script or binary")
+	cmd.Flags().StringArrayVarP(&cfg.fileArgs, "args", "a", []string{}, "File arguments")
 	cmd.Flags().StringVarP(&cfg.destPath, "dest-path", "d", "/tmp", "Destination path for the script or binary")
+	cmd.Flags().StringVarP(&cfg.runner, "runner", "r", "", "Custom runner for the script (e.g., 'python', 'node')")
 
 	cmd.MarkFlagRequired("context")
 	cmd.MarkFlagRequired("file")
@@ -102,6 +104,7 @@ func runRop(ctx context.Context, cfg *config) error {
 		app.WithFileType(cfg.fileType),
 		app.WithArgs(cfg.fileArgs),
 		app.WithDestPath(cfg.destPath),
+		app.WithRunner(cfg.runner),
 	)
 
 	return appInstance.Run(ctx)
