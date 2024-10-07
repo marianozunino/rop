@@ -4,27 +4,25 @@ import (
 	"flag"
 	"os"
 
+	"github.com/marianozunino/rop/internal/k8s"
 	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 type App struct {
-	kubeContext   string
-	filePath      string
-	podName       string
-	containerName string
-	noConfirm     bool
-	fileType      string
-	args          []string
-	destPath      string
-	runner        string
+	filePath  string
+	podName   string
+	noConfirm bool
+	fileType  string
+	args      []string
+	destPath  string
+	runner    string
 
-	namespace string
-	clientset *kubernetes.Clientset
-	config    *rest.Config
-	pod       *corev1.Pod
+	client      *k8s.Client
+	kubeContext string
+	namespace   string
+	pod         *corev1.Pod
+	container   string
 }
 
 // Option setters for App struct
@@ -54,7 +52,7 @@ func WithPodName(podName string) func(app *App) {
 
 func WithContainerName(containerName string) func(app *App) {
 	return func(app *App) {
-		app.containerName = containerName
+		app.container = containerName
 	}
 }
 

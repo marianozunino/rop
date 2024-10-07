@@ -27,7 +27,8 @@ import (
 	"fmt"
 	"os"
 
-	app "github.com/marianozunino/rop/internal"
+	"github.com/marianozunino/rop/internal/app"
+	"github.com/marianozunino/rop/internal/k8s"
 	"github.com/marianozunino/rop/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -102,7 +103,7 @@ func addFlags(cmd *cobra.Command, cfg *config) {
 }
 
 func contextCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	contexts, err := app.GetAvailableContexts()
+	contexts, err := k8s.GetAvailableContexts()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting contexts: %v\n", err)
 		return nil, cobra.ShellCompDirectiveError
@@ -117,7 +118,7 @@ func namespaceCompletion(cmd *cobra.Command, args []string, toComplete string) (
 		return nil, cobra.ShellCompDirectiveError
 	}
 
-	namespaces, err := app.GetAvailableNamespaces(context)
+	namespaces, err := k8s.GetAvailableNamespaces(context)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting namespaces: %v\n", err)
 		return nil, cobra.ShellCompDirectiveError

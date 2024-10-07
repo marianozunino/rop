@@ -1,4 +1,4 @@
-package app
+package ui
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func runContainerSelection(containers []string) (string, error) {
+func RunContainerSelection(containers []string) (string, error) {
 	if len(containers) == 0 {
 		return "", fmt.Errorf("no containers available")
 	}
@@ -41,7 +41,7 @@ var (
 	containerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(containerStyleStr))
 )
 
-func confirmAction(command, podName, containerName string) error {
+func ConfirmAction(command, podName, container string) error {
 	var confirm bool
 	err := huh.NewForm(
 		huh.NewGroup(
@@ -49,7 +49,7 @@ func confirmAction(command, podName, containerName string) error {
 				fmt.Sprintf("Are you sure you want to execute '%s' on pod '%s' in container '%s'?",
 					commandStyle.Render(command),
 					podStyle.Render(podName),
-					containerStyle.Render(containerName)),
+					containerStyle.Render(container)),
 			),
 			huh.NewConfirm().Title("Confirm action?").Affirmative("Yes").Negative("No").Value(&confirm),
 		),
