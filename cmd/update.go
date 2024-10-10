@@ -1,168 +1,213 @@
+/*
+Copyright © 2024 Mariano Zunino <marianoz@posteo.net>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
 package cmd
 
 import (
 	"archive/tar"
-	"bytes"
 	"compress/gzip"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	update "github.com/fynelabs/selfupdate"
+	"github.com/Masterminds/semver/v3"
+	"github.com/marianozunino/rop/internal/logger"
+	"github.com/minio/selfupdate"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
-var updateCmd = &cobra.Command{
-	Use:   "update",
-	Short: "Update rop to the latest version",
-	Long:  `Update rop to the latest version either using go install or by downloading the binary from GitHub.`,
-	Run:   runUpdate,
+func NewUpdateCmd() *cobra.Command {
+	cfg := &config{}
+
+	updateCmd := &cobra.Command{
+		Use:   "update",
+		Short: "Update rop to the latest version",
+		Run: func(cmd *cobra.Command, args []string) {
+			logger.ConfigureLogger(cfg.verbose)
+			if err := runSelfUpdate(http.DefaultClient, afero.NewOsFs(), os.Args[0]); err != nil {
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
+			}
+		},
+	}
+
+	return updateCmd
 }
 
 func init() {
-	rootCmd.AddCommand(updateCmd)
+	rootCmd.AddCommand(NewUpdateCmd())
 }
 
-func runUpdate(cmd *cobra.Command, args []string) {
-	fmt.Println("Checking for updates...")
+func getAssetName() string {
+	os := runtime.GOOS
+	arch := runtime.GOARCH
 
-	// Check if the binary was installed using go install
-	if installedWithGo() {
-		fmt.Println("Updating using go install...")
-		if err := updateWithGoInstall(); err != nil {
-			fmt.Printf("Error updating with go install: %v\n", err)
-			os.Exit(1)
-		}
-	} else {
-		fmt.Println("Updating by downloading the latest release...")
-		if err := updateFromGitHub(); err != nil {
-			fmt.Printf("Error updating from GitHub: %v\n", err)
-			os.Exit(1)
-		}
+	switch os {
+	case "darwin":
+		os = "Darwin"
+	case "linux":
+		os = "Linux"
 	}
 
-	fmt.Println("Update completed successfully!")
-}
-
-func installedWithGo() bool {
-	// Check if the binary is in GOPATH
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		gopath = filepath.Join(os.Getenv("HOME"), "go")
-	}
-	binPath := filepath.Join(gopath, "bin", "rop")
-	fmt.Printf("Checking if %s exists...\n", binPath)
-	_, err := os.Stat(binPath)
-	return err == nil
-}
-
-func updateWithGoInstall() error {
-	cmd := exec.Command("go", "install", "github.com/marianozunino/rop@latest")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func updateFromGitHub() error {
-	// Construct the URL for the latest release
-	// Platform with first letter capitalized
-	platform := strings.ToUpper(runtime.GOOS[:1]) + runtime.GOOS[1:]
-
-	arch := ""
-	switch runtime.GOARCH {
+	switch arch {
 	case "amd64":
 		arch = "x86_64"
-	case "arm64":
-		arch = "arm64"
 	case "386":
 		arch = "i386"
-	default:
-		return fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
+
 	}
 
-	url := fmt.Sprintf("https://github.com/marianozunino/rop/releases/latest/download/rop_%s_%s.tar.gz", platform, arch)
-	fmt.Printf("URL: %s\n", url)
+	return fmt.Sprintf("rop_%s_%s.tar.gz", os, arch)
+}
 
-	// Download the file
-	resp, err := http.Get(url)
+func runSelfUpdate(httpClient *http.Client, fs afero.Fs, executablePath string) error {
+	log.Info().Msg("Checking for updates...")
+
+	releaseURL := "https://github.com/marianozunino/rop/releases/latest"
+
+	resp, err := httpClient.Get(releaseURL)
+	if err != nil {
+		return fmt.Errorf("error checking for updates: %v", err)
+	}
+	defer resp.Body.Close()
+
+	latestVersionStr := filepath.Base(resp.Request.URL.Path)
+	latestVersionStr = strings.TrimPrefix(latestVersionStr, "v")
+	currentVersionStr := strings.TrimPrefix(Version, "v")
+
+	latestVersion, err := semver.NewVersion(latestVersionStr)
+	if err != nil {
+		return fmt.Errorf("error parsing latest version: %v", err)
+	}
+
+	currentVersion, err := semver.NewVersion(currentVersionStr)
+	if err != nil {
+		return fmt.Errorf("error parsing current version: %v", err)
+	}
+
+	if !latestVersion.GreaterThan(currentVersion) {
+		log.Info().Msg("Current version is the latest")
+		return nil
+	}
+
+	log.Info().Msgf("New version available: %s (current: %s)", latestVersion, currentVersion)
+
+	assetName := getAssetName()
+	downloadURL := fmt.Sprintf("https://github.com/marianozunino/rop/releases/download/v%s/%s", latestVersion, assetName)
+
+	log.Debug().Msgf("Downloading %s from %s", assetName, downloadURL)
+	resp, err = httpClient.Get(downloadURL)
 	if err != nil {
 		return fmt.Errorf("error downloading update: %v", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status: %s", resp.Status)
+	// Extract the tar.gz file
+	tmpDir, err := os.MkdirTemp("", "rop-update")
+	if err != nil {
+		return fmt.Errorf("error creating temp directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	log.Info().Msg("Extracting update package...")
+	if err := extractTarGz(resp.Body, tmpDir); err != nil {
+		return fmt.Errorf("error extracting update: %v", err)
 	}
 
-	// Create a temporary file to store the downloaded content
-	tmpfile, err := os.CreateTemp("", "rop_update_*.tar.gz")
-	if err != nil {
-		return fmt.Errorf("can't create temporary file: %v", err)
-	}
-	defer os.Remove(tmpfile.Name())
-
-	// Write the body to file
-	_, err = io.Copy(tmpfile, resp.Body)
-	if err != nil {
-		return fmt.Errorf("error writing to temporary file: %v", err)
-	}
-
-	// Extract the binary from the tar.gz file
-	binary, err := extractBinary(tmpfile.Name())
-	if err != nil {
-		return fmt.Errorf("error extracting binary: %v", err)
-	}
-	fmt.Printf("Extracted binary, size: %d bytes\n", len(binary))
+	// Locate the new binary in the extracted files
+	newBinaryPath := filepath.Join(tmpDir, "rop")
 
 	// Apply the update
-	err = update.Apply(bytes.NewReader(binary), update.Options{})
+	newBinary, err := os.Open(newBinaryPath)
 	if err != nil {
-		return fmt.Errorf("error applying update: %v", err)
+		return fmt.Errorf("error opening new binary: %v", err)
+	}
+	defer newBinary.Close()
+
+	log.Info().Msg("Applying update...")
+	err = selfupdate.Apply(newBinary, selfupdate.Options{})
+	if err != nil {
+		if rerr := selfupdate.RollbackError(err); rerr != nil {
+			return fmt.Errorf("failed to rollback from bad update: %v", rerr)
+		}
+		return fmt.Errorf("error updating binary: %v", err)
 	}
 
+	log.Info().Msgf("Successfully updated to version %s", latestVersion)
 	return nil
 }
 
-func extractBinary(archivePath string) ([]byte, error) {
-	// Open the tar.gz file
-	f, err := os.Open(archivePath)
+// extractTarGz extracts a tar.gz file to a specified directory
+
+func extractTarGz(r io.Reader, dst string) error {
+	gz, err := gzip.NewReader(r)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("error creating gzip reader: %v", err)
 	}
-	defer f.Close()
+	defer gz.Close()
 
-	gzr, err := gzip.NewReader(f)
-	if err != nil {
-		return nil, err
-	}
-	defer gzr.Close()
-
-	tr := tar.NewReader(gzr)
-
-	// Find the binary in the archive
+	tr := tar.NewReader(gz)
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
-			break
+			break // End of archive
 		}
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("error reading tar header: %v", err)
 		}
 
-		if strings.HasSuffix(header.Name, "rop") {
-			// Read the entire contents of the file
-			binary, err := io.ReadAll(tr)
-			if err != nil {
-				return nil, err
+		target := filepath.Join(dst, header.Name)
+
+		// Ensure the directory exists
+		if header.Typeflag == tar.TypeDir {
+			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
+				return fmt.Errorf("error creating directory %s: %v", target, err)
 			}
-			return binary, nil
+			continue
 		}
-	}
 
-	return nil, fmt.Errorf("binary not found in the archive")
+		// Create the necessary directories
+		if err := os.MkdirAll(filepath.Dir(target), os.ModePerm); err != nil {
+			return fmt.Errorf("error creating directory %s: %v", filepath.Dir(target), err)
+		}
+
+		// Create a new file
+		outFile, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY, os.FileMode(header.Mode))
+		if err != nil {
+			return fmt.Errorf("error creating file %s: %v", target, err)
+		}
+
+		// Write the file content
+		if _, err := io.Copy(outFile, tr); err != nil {
+			return fmt.Errorf("error writing to file %s: %v", target, err)
+		}
+		outFile.Close()
+	}
+	return nil
 }
+
